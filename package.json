@@ -1,0 +1,11 @@
+{
+  "name": "offline-favourites",
+  "version": "1.0.0",
+  "description": "Prototype for linking DHIS2 favourites with excel templates.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Olav Poppe",
+  "license": "ISC"
+}
