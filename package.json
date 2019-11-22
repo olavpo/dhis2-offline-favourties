@@ -4,8 +4,9 @@
   "description": "Prototype for linking DHIS2 favourites with excel templates.",
   "main": "scripts.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "mkdir build; browserify scripts.js -o build/bundle.js; cp index.html build/; cp manifest.webapp build/; cd build; zip -R ../app.zip *"
+    "build": "mkdir build; browserify scripts.js -o build/bundle.js; cp index.html build/; cp manifest.webapp build/;",
+    "package": "npm run build; cd build; zip -R ../app.zip *; npm run clean",
+    "clean": "rm -r build"
   },
   "author": "Olav Poppe",
   "license": "ISC",
