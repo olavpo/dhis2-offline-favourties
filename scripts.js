@@ -1,7 +1,6 @@
 const request = require("request");
 const XlsxPopulate = require("xlsx-populate");
 
-var serverInfo = {"url": "http://localhost:9000/demo", "username": "admin", "password": "district"};
 var DEBUG = false;
 
 async function populate(favId, resourceId) {
@@ -269,16 +268,13 @@ function ouParam(fav) {
 
 /** DHIS2 COMMUNICATION */
 async function d2Get(apiResource) {
-	var url = serverInfo.url + "/api/" + apiResource;
+	//TODO: do properly
+	var url = window.location.href.replace("apps/Offline-Analytics-Helper/index.html", "") + apiResource;
 	return new Promise(function(resolve, reject) {
 		// Do async job
 		request.get({
 			uri: url,
-			json: true,
-			auth: {
-				"user": serverInfo.username,
-				"pass": serverInfo.password
-			}
+			json: true
 		}, function (error, response, data) {
 			if (!error && response.statusCode === 200) {
 				resolve(data);
@@ -295,16 +291,13 @@ async function d2Get(apiResource) {
 
 /** DHIS2 COMMUNICATION */
 async function d2GetFile(apiResource) {
-	var url = serverInfo.url + "/api/" + apiResource;
+	//TODO: do properly
+	var url = window.location.href.replace("apps/Offline-Analytics-Helper/index.html", "") + apiResource;
 	return new Promise(function(resolve, reject) {
 		// Do async job
 		request.get({
 			uri: url,
-			encoding: null,
-			auth: {
-				"user": serverInfo.username,
-				"pass": serverInfo.password
-			}
+			encoding: null
 		}, function (error, response, data) {
 			if (!error && response.statusCode === 200) {
 				resolve(data);

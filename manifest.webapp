@@ -1,7 +1,7 @@
 {
-    "version": "0.1",
-    "name": "Offline analytics",
-    "description": "Offline analytics prototype",
+    "version": "0.1.1",
+    "name": "Offline Analytics Helper",
+    "description": "Offline analytics helper prototype",
     "launch_path": "/index.html",
     "appType": "APP",
     "icons": {
