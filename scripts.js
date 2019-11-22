@@ -1,17 +1,65 @@
 const request = require("request");
-var serverInfo = {"url": "http://10.0.1.184:9000/demo", "username": "admin", "password": "district"};
+const XlsxPopulate = require("xlsx-populate");
+
+var serverInfo = {"url": "http://localhost:9000/demo", "username": "admin", "password": "district"};
 var DEBUG = false;
 
-getPivotTable("Nc1J9fLpdiV");
-/*getPivotTable("lveiaLL3aHc");
-getPivotTable("cyv69CByL5O");
-getPivotTable("WsALeoKdFTH");
-getPivotTable("FdDk4VcHOYm");*/
+async function populate(favId, resourceId) {
+	let resource = await getResource(resourceId);
+	let data = await getPivotTable(favId);
+	
+	//this could potentially involve adding columns for ou hierarhy, iso-format perios etc
+	let dataSource = prepDataTable(data, ",");
 
+	resource.sheet("DHIS2 Data").usedRange().value(null);
+	resource.sheet("DHIS2 Data").cell("A1").value(dataSource);
+    return resource;
+}
+
+
+async function create(favId) {
+	let data = await getPivotTable(favId);
+	
+	//this could potentially involve adding columns for ou hierarhy, iso-format perios etc
+	let dataSource = prepDataTable(data, ",");
+	let resource = await XlsxPopulate.fromBlankAsync();
+	resource.addSheet("DHIS2 Data").cell("A1").value(dataSource);
+	resource.deleteSheet("Sheet1");
+    return resource;
+}
+
+
+function prepDataTable(data, separator) {
+	let table = data.rows, headerRow = [], valueCol;
+	for (let i = 0; i < data.headers.length; i++) {
+		if (!data.headers[i].hidden) headerRow.push(data.headers[i].column);
+		if (data.headers[i].name == "value") valueCol = i;
+	}
+	table.unshift(headerRow);
+	
+	//TODO: figure our how to deal with decimal points, which depends on excel internationalisation
+	//For now, remove trailing .0
+	for (let dataRow of table) {
+		//If numeric
+		if (!isNaN(dataRow[valueCol])) {
+			if (Number.isInteger(dataRow[valueCol])) {
+				dataRow[valueCol] = parseInt(dataRow[valueCol]);
+			}
+			else {
+				dataRow[valueCol] = parseFloat(dataRow[valueCol]);
+			}
+		}
+	}
+	
+	return table;
+}
+
+
+//Get data (analytics request) from report table favourite
 async function getPivotTable(id) {
 	let metadata = await d2Get("reportTables/" + id + ".json?fields=:owner");
 	
-	let analyticsRequest = "analytics.csv?displayProperty=NAME&outputIdScheme=NAME";
+	let analyticsRequest = "analytics.json?displayProperty=NAME&outputIdScheme=NAME";
 	analyticsRequest += optionParam(metadata);
 	analyticsRequest += ouParam(metadata);	
 	analyticsRequest += peParam(metadata);	
@@ -25,14 +73,16 @@ async function getPivotTable(id) {
 	if (DEBUG) console.log(id + " => " + analyticsRequest);
 	
 	let data = await d2Get(analyticsRequest);
-	console.log(data);
 	return data;
 }
 
 
+//Get resource (template)
 async function getResource(id) {
-	
-
+	console.log("Getting resource " + id);
+	let templateBuffer = await d2GetFile("documents/" + id + "/data");
+	let template = await XlsxPopulate.fromDataAsync(templateBuffer);
+	return template;
 }
 
 
@@ -215,12 +265,6 @@ function ouParam(fav) {
 }
 
 
-//Called from index.html
-function makeDocument() {
-	let favId = document.getElementById('favourite').value;
-	let resourceId = document.getElementById('resource').value
-	console.log(favId + " + " + resourceId);
-}
 
 
 /** DHIS2 COMMUNICATION */
@@ -249,6 +293,82 @@ async function d2Get(apiResource) {
 }
 
 
+/** DHIS2 COMMUNICATION */
+async function d2GetFile(apiResource) {
+	var url = serverInfo.url + "/api/" + apiResource;
+	return new Promise(function(resolve, reject) {
+		// Do async job
+		request.get({
+			uri: url,
+			encoding: null,
+			auth: {
+				"user": serverInfo.username,
+				"pass": serverInfo.password
+			}
+		}, function (error, response, data) {
+			if (!error && response.statusCode === 200) {
+				resolve(data);
+			}
+			else {
+				console.log("Error in GET");
+				console.log(error.message);
+				reject({"data": data, "error": error, "status": response});
+			}
+		});
+	});
+}
+
+/** BROWSER FUNCTION */
+window.onload = function () {
+	window.document.getElementById("makeDocumentButton").addEventListener("click", makeDocument);
+	window.document.getElementById("populateDocumentButton").addEventListener("click", populateDocument);
+}
+
+async function makeDocument() {
+	let favId = window.document.getElementById('favouriteNew').value;
+	
+	//Create new excel document with pivot table data
+	var document = await create(favId);
+	
+	//Download template
+	document.outputAsync()
+      .then(function (blob) {
+        var url = window.URL.createObjectURL(blob);
+		var a = window.document.createElement("a");
+		window.document.body.appendChild(a);
+		a.href = url;
+		a.download = "new_template.xlsx";
+		a.click();
+		window.URL.revokeObjectURL(url);
+		window.document.body.removeChild(a);
+		});
+}
+
+async function populateDocument() {
+	let favId = window.document.getElementById('favourite').value;
+	let resourceId = window.document.getElementById('resource').value
+	let name = window.document.getElementById('name').value
+	
+	//Populate template with data from favourite
+	let document = await populate(favId, resourceId);
+	console.log(document);
+	
+	//Download template with data
+	document.outputAsync()
+    .then(function (blob) {
+        var url = window.URL.createObjectURL(blob);
+		var a = window.document.createElement("a");
+		window.document.body.appendChild(a);
+		a.href = url;
+		a.download = name + ".xlsx";
+		a.click();
+		window.URL.revokeObjectURL(url);
+		window.document.body.removeChild(a);
+    });
+}
+
+
+/** "CONSTANTS" */
 const relativePeriodMap = {
 "biMonthsThisYear": "BIMONTHS_THIS_YEAR",
 "last12Months": "LAST_12_MONTHS",

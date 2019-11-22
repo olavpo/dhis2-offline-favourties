@@ -1,21 +1,37 @@
 <!doctype html>
-
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-
-  <title>Offline Favourites</title>
-  <meta name="description" content="Offline Favourites">
-
-  <link rel="stylesheet" href="styles.css">
-
+	<meta charset="utf-8">
+	<title>Offline Favourites</title>
+	<meta name="description" content="Offline Favourites">
 </head>
-
 <body>
-  <script src="bundle.js"></script>
-  <script src="scripts.js"></script>
-  <label>Favourites ID</label><input id="favourite">
-  <label>Resource ID</label><input id="resource">
-  <button onclick="makeDocument()">Download</button>
+<script src="bundle.js"></script>
+
+<h2>
+	Create empty excel file with data
+</h2>
+<p>
+	Downloads excel file with the raw data of the given report table favourite. 
+	Use this to create a new template which can be uploaded as a DHIS2 resource.
+</p>
+<label>Favourite ID</label>
+<input id="favouriteNew">
+<button id="makeDocumentButton">Download</button> 
+<hr />
+<h2>
+	Populate existing excel template with data
+</h2>
+<p>
+	Populates the excel file of the given resource with the latest data from the
+	specified favourite.
+</p>
+<label>Favourite ID</label>
+<input id="favourite" value="Nc1J9fLpdiV"></input>
+<label>Resource ID</label>
+<input id="resource" value="RemJdGP9Of4"></input>
+<label>Name</label>
+<input id="name" value="Test"></input>
+<button id="populateDocumentButton">Download</button> 
 </body>
 </html>

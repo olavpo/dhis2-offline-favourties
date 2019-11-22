@@ -5,12 +5,13 @@
   "main": "scripts.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "browserify scripts.js -o bundle.js"
+    "build": "mkdir build; browserify scripts.js -o build/bundle.js; cp index.html build/; cp manifest.webapp build/; cd build; zip -R ../app.zip *"
   },
   "author": "Olav Poppe",
   "license": "ISC",
   "dependencies": {
-    "request": "^2.88.0"
+    "request": "^2.88.0",
+    "xlsx-populate": "^1.20.1"
   },
   "devDependencies": {
     "browserify": "latest"
