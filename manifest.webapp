@@ -1,0 +1,27 @@
+{
+    "version": "0.1",
+    "name": "Offline analytics",
+    "description": "Offline analytics prototype",
+    "launch_path": "/index.html",
+    "appType": "APP",
+    "icons": {
+        "16": "/img/icons/mortar-16.png",
+        "48": "/img/icons/mortar-48.png",
+        "128": "/img/icons/mortar-128.png"
+    },
+    "developer": {
+        "name": "Olav Poppe",
+        "url": "https://ifi.uio.no"
+    },
+    "default_locale": "en",
+    "activities": {
+        "dhis": {
+            "href": "*",
+            "namespace": "offline_analytics"
+        }
+    },
+    "authorities": [
+         "OFFLINE-ANALYTICS_MANAGE",
+         "OFFLINE-ANALYTICS_VIEW"
+    ]
+}
