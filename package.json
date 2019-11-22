@@ -2,10 +2,17 @@
   "name": "offline-favourites",
   "version": "1.0.0",
   "description": "Prototype for linking DHIS2 favourites with excel templates.",
-  "main": "app.js",
+  "main": "scripts.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "browserify scripts.js -o bundle.js"
   },
   "author": "Olav Poppe",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "request": "^2.88.0"
+  },
+  "devDependencies": {
+    "browserify": "latest"
+  }
 }
