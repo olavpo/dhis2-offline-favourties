@@ -1,14 +1,17 @@
 const request = require("request");
 const XlsxPopulate = require("xlsx-populate");
+const List = require("list.js");
+const $ = require("jquery");
 
 var DEBUG = false;
+var favList = [], templateList;
 
-async function populate(favId, resourceId) {
+async function populate(favId, resourceId, ouHierarchy, numDem) {
 	let resource = await getResource(resourceId);
-	let data = await getPivotTable(favId);
+	let data = await getPivotTable(favId, ouHierarchy, numDem);
 	
 	//this could potentially involve adding columns for ou hierarhy, iso-format perios etc
-	let dataSource = prepDataTable(data, ",");
+	let dataSource = prepDataTable(data, ",", ouHierarchy, numDem);
 
 	resource.sheet("DHIS2 Data").usedRange().value(null);
 	resource.sheet("DHIS2 Data").cell("A1").value(dataSource);
@@ -16,11 +19,11 @@ async function populate(favId, resourceId) {
 }
 
 
-async function create(favId) {
-	let data = await getPivotTable(favId);
+async function create(favId, ouHierarchy, numDem) {
+	let data = await getPivotTable(favId, ouHierarchy, numDem);
 	
 	//this could potentially involve adding columns for ou hierarhy, iso-format perios etc
-	let dataSource = prepDataTable(data, ",");
+	let dataSource = prepDataTable(data, ",", ouHierarchy, numDem);
 	let resource = await XlsxPopulate.fromBlankAsync();
 	resource.addSheet("DHIS2 Data").cell("A1").value(dataSource);
 	resource.deleteSheet("Sheet1");
@@ -28,37 +31,103 @@ async function create(favId) {
 }
 
 
-function prepDataTable(data, separator) {
-	let table = data.rows, headerRow = [], valueCol;
+function prepDataTable(data, separator, ouHierarchy, numDem) {
+	let table = data.rows, headerRow = [], valueCol, ouCol, metaData = data.metaData;
+	
+	//Make header row with column names
 	for (let i = 0; i < data.headers.length; i++) {
 		if (!data.headers[i].hidden) headerRow.push(data.headers[i].column);
 		if (data.headers[i].name == "value") valueCol = i;
+		if (data.headers[i].name == "ou") ouCol = i;
 	}
+	//Add header row at the top of the data table
 	table.unshift(headerRow);
 	
-	//TODO: figure our how to deal with decimal points, which depends on excel internationalisation
-	//For now, remove trailing .0
-	for (let dataRow of table) {
-		//If numeric
-		if (!isNaN(dataRow[valueCol])) {
-			if (Number.isInteger(dataRow[valueCol])) {
-				dataRow[valueCol] = parseInt(dataRow[valueCol]);
-			}
-			else {
-				dataRow[valueCol] = parseFloat(dataRow[valueCol]);
-			}
-		}
+	//Fix numeric values (rounding) to work better with Excel 
+	prepDataRouding(table, valueCol);
+	
+	//Add orgunit hierarchy
+	if (ouHierarchy) {
+		prepDataOuHierarchy(table, metaData, ouCol);
 	}
 	
 	return table;
 }
 
+//TODO: figure our how to deal with decimal points, which depends on excel internationalisation
+//For now, remove trailing .0
+function prepDataRouding(table, valueCol) {
+	for (let dataRow of table) {
+	
+		//Same problem applies when numDem are included, 
+		//so look at all columns on or after valueCol
+
+		for (var i = valueCol; i < dataRow.length; i++) {
+			//If numeric
+			if (!isNaN(dataRow[i])) {
+				if (Number.isInteger(dataRow[i])) {
+					dataRow[i] = parseInt(dataRow[i]);
+				}
+				else {
+					dataRow[i] = parseFloat(dataRow[i]);
+				}
+			}
+		}
+	}
+}
+
+
+function prepDataOuHierarchy(table, metaData, ouCol) {
+	//Add header
+	let hierarchyHeader = [];
+	let maxLevels = metaDataMaxOuLevel(metaData);
+	for (let i = 1; i <= maxLevels; i++) { 
+		hierarchyHeader.push("Level " + i);
+	}
+	table[0] = hierarchyHeader.concat(table[0]);
+	
+	for (let i = 1; i < table.length; i++) {
+		let ouId = metaDataIdFromName(metaData, table[i][ouCol]);
+		let hieararchyNames = metaData.ouNameHierarchy[ouId].split("/");
+		//First is empty string
+		hieararchyNames.shift();
+		
+		//Add empty entries, necessary if orgunits in report are at different depths in the ou hierarchy
+		while (hieararchyNames.length < maxLevels) hieararchyNames.push("");
+
+		table[i] = hieararchyNames.concat(table[i]);
+	}
+}
+
+
+function metaDataMaxOuLevel(metaData) {
+	let ouHierarchy = metaData.ouNameHierarchy,  max = 1, current = 1;
+	for (let key in ouHierarchy) {
+		 current = ouHierarchy[key].split("/").length;
+		 if (current > max) max = current;
+	}
+	//Remove one, which is empty string because of leading "/" in string
+	return (max - 1);
+	
+}
+
+function metaDataIdFromName(metaData, name) {
+	let ids = Object.keys(metaData.items);
+	for (let itemId of ids) {
+		if (metaData.items[itemId]["name"] == name) return itemId;
+	}
+	console.log("Item name not found: " + name);
+	return null;
+}
+
 
 //Get data (analytics request) from report table favourite
-async function getPivotTable(id) {
+async function getPivotTable(id, ouHierarchy, numDem) {
 	let metadata = await d2Get("reportTables/" + id + ".json?fields=:owner");
 	
-	let analyticsRequest = "analytics.json?displayProperty=NAME&outputIdScheme=NAME";
+	let analyticsRequest = "analytics.json?displayProperty=NAME&outputIdScheme=NAME";	
+	if (numDem) analyticsRequest += "&includeNumDen=true";
+	if (ouHierarchy) analyticsRequest += "&showHierarchy=true";
 	analyticsRequest += optionParam(metadata);
 	analyticsRequest += ouParam(metadata);	
 	analyticsRequest += peParam(metadata);	
@@ -281,8 +350,71 @@ async function d2Get(apiResource) {
 			}
 			else {
 				console.log("Error in GET");
-				console.log(error.message);
 				reject({"data": data, "error": error, "status": response});
+			}
+		});
+	});
+}
+
+async function d2Get(apiResource) {
+	//TODO: do properly
+	var url = window.location.href.replace("apps/Offline-Analytics-Helper/index.html", "") + apiResource;
+	return new Promise(function(resolve, reject) {
+		// Do async job
+		request.get({
+			uri: url,
+			json: true
+		}, function (error, response, data) {
+			if (!error && response.statusCode === 200) {
+				resolve(data);
+			}
+			else {
+				console.log("Error in GET");
+				reject({"data": data, "error": error, "status": response});
+			}
+		});
+	});
+}
+
+
+async function d2Post(apiResource, data) {
+	//TODO: do properly
+	var url = window.location.href.replace("apps/Offline-Analytics-Helper/index.html", "") + apiResource;
+
+	return new Promise(function(resolve, reject) {
+		request.post({
+			uri: url,
+			json: true,
+			body: data
+		}, function (error, response, data) {
+			if (!error && response.statusCode === 200) {
+				resolve(data);
+			}
+			else {
+				console.log("Error in POST");
+				reject({"data": data, "error": error, "status": response.statusCode});
+			}
+		});
+	});
+}
+
+
+async function d2Put(apiResource, data) {
+	//TODO: do properly
+	var url = window.location.href.replace("apps/Offline-Analytics-Helper/index.html", "") + apiResource;
+
+	return new Promise(function(resolve, reject) {
+		request.put({
+			uri: url,
+			json: true,
+			body: data
+		}, function (error, response, data) {
+			if (!error && response.statusCode === 200) {
+				resolve(data);
+			}
+			else {
+				console.log("Error in POST");
+				reject({"data": data, "error": error, "status": response.statusCode});
 			}
 		});
 	});
@@ -315,13 +447,50 @@ async function d2GetFile(apiResource) {
 window.onload = function () {
 	window.document.getElementById("makeDocumentButton").addEventListener("click", makeDocument);
 	window.document.getElementById("populateDocumentButton").addEventListener("click", populateDocument);
+	window.document.getElementById("saveFavouriteButton").addEventListener("click", saveFavourite);
+	
+	//Get list of current favourites
+	listTemplates();
 }
 
+function buttonListeners() {
+	$('.tableButton').on('click', function (e) {
+    	populateFavourite($(this).parent().parent().data("templateid"));        
+    });  
+}
+
+async function listTemplates() {
+	try {
+		favList = await d2Get("dataStore/offline-templates/list");
+		
+	}
+	catch (error) {
+		//TODO: Check if namespace doesn't exist based on error, for now assume that's the problem
+		console.log(error);
+		let status = await d2Post("dataStore/offline-templates/list", []);
+		favList = [];
+	}
+	
+	let options = {
+	  	valueNames: [ 'name', 'favouriteId', "resourceId", { data: ['templateId'] },],
+  		item: '<tr><td class="name"></td><td class="favouriteId"></td><td class="resourceId"></td><td><button class="tableButton">Download</td></tr>'
+	};
+	templateList = new List('templateList', options, favList);
+	
+	//Add event listeners that checks for clicks on "Download" in the list
+	//Make sure the event listeners are updated when the list is changed
+	buttonListeners();
+	templateList.on("updated", buttonListeners);
+}
+
+
 async function makeDocument() {
-	let favId = window.document.getElementById('favouriteNew').value;
+	let favId = window.document.getElementById('favouriteNew').value;	
+	let ouHierarchy = window.document.getElementById('ouHierarchyNew').checked;
+	let numDem = window.document.getElementById('numDemNew').checked;
 	
 	//Create new excel document with pivot table data
-	var document = await create(favId);
+	var document = await create(favId, ouHierarchy, numDem);
 	
 	//Download template
 	document.outputAsync()
@@ -337,13 +506,16 @@ async function makeDocument() {
 		});
 }
 
+
 async function populateDocument() {
 	let favId = window.document.getElementById('favourite').value;
-	let resourceId = window.document.getElementById('resource').value
+	let resourceId = window.document.getElementById('resource').value;
+	let ouHierarchy = window.document.getElementById('ouHierarchy').checked;
+	let numDem = window.document.getElementById('numDem').checked;
 	let name = window.document.getElementById('name').value
 	
 	//Populate template with data from favourite
-	let document = await populate(favId, resourceId);
+	let document = await populate(favId, resourceId, ouHierarchy, numDem);
 	console.log(document);
 	
 	//Download template with data
@@ -358,6 +530,61 @@ async function populateDocument() {
 		window.URL.revokeObjectURL(url);
 		window.document.body.removeChild(a);
     });
+}
+
+
+async function populateFavourite(templateId) {
+	console.log(templateId);
+	let fav;
+	for (fav of favList) {
+		if (fav["templateId"] == templateId) break;
+	}
+	
+	let favId = fav.favouriteId;
+	let resourceId = fav.resourceId;
+	let ouHierarchy = fav.ouHierarchy;
+	let numDem = fav.numDem;
+	let name = fav.name;
+	
+	//Populate template with data from favourite
+	let document = await populate(favId, resourceId, ouHierarchy, numDem);
+	
+	//Download template with data
+	document.outputAsync()
+    .then(function (blob) {
+        var url = window.URL.createObjectURL(blob);
+		var a = window.document.createElement("a");
+		window.document.body.appendChild(a);
+		a.href = url;
+		a.download = name + ".xlsx";
+		a.click();
+		window.URL.revokeObjectURL(url);
+		window.document.body.removeChild(a);
+    });
+    
+}
+
+
+async function saveFavourite() {
+	let favId = window.document.getElementById('favourite').value;
+	let resourceId = window.document.getElementById('resource').value;
+	let ouHierarchy = window.document.getElementById('ouHierarchy').checked;
+	let numDem = window.document.getElementById('numDem').checked;
+	let name = window.document.getElementById('name').value
+	
+	let newFav = {
+		"favouriteId": favId,
+		"resourceId": resourceId,
+		"ouHierarchy": ouHierarchy,
+		"numDem": numDem,
+		"name": name,
+		"templateId": favId + "-" + resourceId
+	};
+	favList.push(newFav);
+	await d2Put("dataStore/offline-templates/list", favList);
+	console.log("Updated favourites");
+	templateList.add(newFav);
+	
 }
 
 

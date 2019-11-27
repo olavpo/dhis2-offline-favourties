@@ -4,34 +4,65 @@
 	<meta charset="utf-8">
 	<title>Offline Analytics Helper</title>
 	<meta name="description" content="Offline Analytics Helper">
+	<script src="bundle.js"></script>
 </head>
 <body>
-<script src="bundle.js"></script>
+
 <h1>Offline Analytics Helper</h1>
-<h2>
+<p>
+	Populates the excel file of the given resource with the latest data from the
+	specified favourite.
+</p>
+
+<h3>Current favourites</h3>
+<div id="templateList" style="min-height: 100px">
+	<table border="1">
+	<thead>
+	<tr>
+        <th>Name</th>
+        <th>Favourite</th>
+        <th>Resource</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody class="list"></tbody>
+    </table>
+</div>
+
+<hr />
+
+<h3>Add new</h3>
+<label>Favourite ID</label>
+<input id="favourite"></input>
+<label>Resource ID</label>
+<input id="resource" ></input>
+<label>Name</label>
+<input id="name"></input>
+</br>
+<label>Include numerator and denominator</label>
+<input type="checkbox" id="numDem" value="false">
+<label>Include orgunit hierarchy</label>
+<input type="checkbox" id="ouHierarchy" value="false">
+<button id="populateDocumentButton">Download now</button> 
+<button id="saveFavouriteButton">Save as template</button> 
+
+<hr />
+
+<h3>
 	Create empty excel file with data
-</h2>
+</h3>
 <p>
 	Downloads excel file with the raw data of the given report table favourite. 
 	Use this to create a new template which can be uploaded as a DHIS2 resource.
 </p>
 <label>Favourite ID</label>
 <input id="favouriteNew"></input>
+<label>Include numerator and denominator</label>
+<input type="checkbox" id="numDemNew" value="false">
+<label>Include orgunit hierarchy</label>
+<input type="checkbox" id="ouHierarchyNew" value="false">
 <button id="makeDocumentButton">Download</button> 
-<hr />
-<h2>
-	Populate existing excel template with data
-</h2>
-<p>
-	Populates the excel file of the given resource with the latest data from the
-	specified favourite.
-</p>
-<label>Favourite ID</label>
-<input id="favourite"></input>
-<label>Resource ID</label>
-<input id="resource" ></input>
-<label>Filename</label>
-<input id="name" value="file"></input>
-<button id="populateDocumentButton">Download</button> 
+
+
 </body>
 </html>
